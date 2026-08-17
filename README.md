@@ -1,4 +1,4 @@
-# 📸 Gemini Card Screenshot & Width Helper
+# 📸 Gemini Lens
 
 A feature-packed, lightweight Chrome Extension designed for **Google Gemini** (`https://gemini.google.com/`). It adds a 1-click GPU-accelerated response screenshot capture with automatic scroll stitching, granular snippet selection mode, instant clipboard copy, dynamic chat width control, and a cleaner interface.
 
@@ -20,7 +20,7 @@ A feature-packed, lightweight Chrome Extension designed for **Google Gemini** (`
 
 1. Clone or download this repository to your local computer:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/gemini-screenshot-extension.git
+   git clone https://github.com/digvijay-ship-it/gemini-lens-.git
    ```
 2. Open Google Chrome (or Brave / Edge) and navigate to:
    ```text
