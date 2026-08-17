@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Helper</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 320px;
+      background: #18191c;
+      color: #f3e8ff;
+      font-family: 'Google Sans', 'Inter', system-ui, -apple-system, sans-serif;
+      padding: 16px;
+      user-select: none;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+
+    .logo-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      font-size: 18px;
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);
+    }
+
+    .logo-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.2px;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      color: #a855f7;
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .section-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #d1d5db;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .current-val {
+      font-size: 11px;
+      font-weight: 600;
+      color: #c084fc;
+      background: rgba(168, 85, 247, 0.15);
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .presets-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .preset-btn {
+      background: #25272c;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #d1d5db;
+      padding: 8px 10px;
+      font-size: 11.5px;
+      font-weight: 500;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .preset-btn:hover {
+      background: #32353c;
+      border-color: #a855f7;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .preset-btn.active {
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      color: #ffffff;
+      border-color: #c084fc;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35);
+    }
+
+    .preset-btn.full-width {
+      grid-column: span 2;
+    }
+
+    .slider-container {
+      background: #202227;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 10px 12px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #374151;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #a855f7;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.8);
+      transition: transform 0.1s ease;
+    }
+
+    .slider::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+    }
+
+    .info-card {
+      background: rgba(168, 85, 247, 0.06);
+      border: 1px solid rgba(168, 85, 247, 0.2);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: #c4b5fd;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      line-height: 1.4;
+    }
+
+    .info-card strong {
+      color: #ffffff;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 10px;
+      color: #6b7280;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-group">
+      <img src="icons/icon32.png" width="28" height="28" alt="Logo" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);">
+      <span class="logo-title">Gemini Helper</span>
+    </div>
+    <span class="badge">v1.0</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title-row">
+      <span class="section-title">↔️ Chat Width</span>
+      <span class="current-val" id="current-width-label">Default</span>
+    </div>
+
+    <div class="presets-grid">
+      <button class="preset-btn" data-width="default">📱 Default (860px)</button>
+      <button class="preset-btn" data-width="1100px">💻 Wide (1100px)</button>
+      <button class="preset-btn" data-width="1400px">🖥️ Ultra (1400px)</button>
+      <button class="preset-btn" data-width="1600px">🚀 Max (1600px)</button>
+      <button class="preset-btn full-width" data-width="96vw">🌐 Full Width (96%)</button>
+    </div>
+
+    <div class="slider-container">
+      <div class="slider-labels">
+        <span>700px (Narrow)</span>
+        <span>Custom Slider</span>
+        <span>1800px (Max)</span>
+      </div>
+      <input type="range" class="slider" id="width-slider" min="700" max="1800" step="20" value="860">
+    </div>
+  </div>
+
+  <div class="info-card">
+    <div>📸 <strong>Card Screenshot:</strong> Hover over any response card to capture Full or Select mode.</div>
+    <div>✨ <strong>Disclaimer Removed:</strong> Bottom AI warning is permanently hidden for clean spacing.</div>
+  </div>
+
+  <div class="footer">
+    Settings auto-saved & synced with Gemini
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
