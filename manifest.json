@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Gemini Card Screenshot Helper",
+  "name": "Gemini Lens - Card Screenshot & Width Helper",
   "version": "1.0",
-  "description": "Adds a premium 1-click GPU-accelerated screenshot button to Gemini response cards with auto-stitching.",
+  "description": "1-click GPU full response screenshots with auto-stitching, element snip mode & custom conversation width controller.",
   "permissions": [
     "activeTab",
     "scripting",
