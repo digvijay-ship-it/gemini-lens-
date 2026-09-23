@@ -53,6 +53,42 @@ function queueCapture(windowId) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'START_FULL_PAGE') {
+    const tabId = message.tabId;
+    if (tabId) {
+      chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['universal_fullpage.js']
+      }).catch((err) => console.error('[Background] Failed to inject universal_fullpage.js:', err));
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (message.action === 'START_SNIP') {
+    const tabId = message.tabId;
+    if (tabId) {
+      chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['universal_snip.js']
+      }).catch((err) => console.error('[Background] Failed to inject universal_snip.js:', err));
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (message.action === 'START_VISIBLE') {
+    const tabId = message.tabId;
+    if (tabId) {
+      chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['universal_visible.js']
+      }).catch((err) => console.error('[Background] Failed to inject universal_visible.js:', err));
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
   if (message.action === 'CAPTURE_VISIBLE_TAB') {
     const windowId = sender.tab && typeof sender.tab.windowId === 'number' ? sender.tab.windowId : null;
     queueCapture(windowId)

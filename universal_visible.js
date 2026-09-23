@@ -170,3 +170,5 @@
     window.__geminiLensVisibleCapturing = false;
   }
 })();
+void 0;
+

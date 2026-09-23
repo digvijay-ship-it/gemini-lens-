@@ -19,18 +19,15 @@ fullPageBtn?.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab || !tab.id) return;
 
-    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
+    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:') || tab.url.startsWith('https://chrome.google.com/webstore')) {
       alert('Cannot run screenshot tools on browser system pages.');
       return;
     }
 
-    // Inject universal_fullpage.js into current page
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['universal_fullpage.js']
-    });
+    // Trigger full page capture via background worker
+    chrome.runtime.sendMessage({ action: 'START_FULL_PAGE', tabId: tab.id });
 
-    // Close popup so the page can scroll and show progress HUD
+    // Close popup UI immediately so it vanishes from screen before capture begins
     window.close();
   } catch (err) {
     console.error('[Popup] Failed to start full page capture:', err);
@@ -44,18 +41,15 @@ snipBtn?.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab || !tab.id) return;
 
-    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
+    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:') || tab.url.startsWith('https://chrome.google.com/webstore')) {
       alert('Cannot run screenshot tools on browser system pages.');
       return;
     }
 
-    // Inject universal_snip.js into current page
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['universal_snip.js']
-    });
+    // Trigger element snipper via background worker
+    chrome.runtime.sendMessage({ action: 'START_SNIP', tabId: tab.id });
 
-    // Close popup so the user can immediately click any element on the page
+    // Close popup UI immediately
     window.close();
   } catch (err) {
     console.error('[Popup] Failed to inject snipper:', err);
@@ -74,13 +68,10 @@ captureScreenBtn?.addEventListener('click', async () => {
       return;
     }
 
-    // Inject universal_visible.js into current page
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['universal_visible.js']
-    });
+    // Trigger visible viewport capture via background worker
+    chrome.runtime.sendMessage({ action: 'START_VISIBLE', tabId: tab.id });
 
-    // Close popup immediately so the UI panel vanishes and doesn't appear in the screenshot
+    // Close popup UI immediately
     window.close();
   } catch (err) {
     console.error('[Popup] Failed to start visible screen capture:', err);
