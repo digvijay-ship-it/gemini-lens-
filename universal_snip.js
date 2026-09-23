@@ -193,7 +193,6 @@
     if (!target) return;
 
     try {
-      showToast('Capturing...', 'Processing element screenshot', '⏳');
       // Scroll into view if needed
       target.scrollIntoView({ behavior: 'instant', block: 'nearest' });
       await new Promise(r => setTimeout(r, 60));
@@ -201,8 +200,33 @@
       const rect = target.getBoundingClientRect();
       const scale = window.devicePixelRatio || 1;
 
+      // Hide any floating helper panels or toolbars during element capture
+      const extraHide = [];
+      ['#gemini-helper-panel', '.quick-btn-group', '.gemini-screenshot-btn-container', '#gemini-lens-toast-container', '[id*="gemini-helper"]', '[class*="gemini-helper"]'].forEach(sel => {
+        try {
+          document.querySelectorAll(sel).forEach(el => {
+            if (el && !el.contains(target) && el !== target && el.style.display !== 'none') {
+              const orig = el.style.display;
+              el.style.setProperty('display', 'none', 'important');
+              extraHide.push({ el, orig });
+            }
+          });
+        } catch (e) {}
+      });
+
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise(r => setTimeout(r, 40));
+
       // Ask background script for visible tab capture
       chrome.runtime.sendMessage({ action: 'CAPTURE_VISIBLE_TAB' }, async (response) => {
+        // Restore hidden panels
+        extraHide.forEach(({ el, orig }) => {
+          try {
+            if (orig) el.style.display = orig;
+            else el.style.removeProperty('display');
+          } catch (e) {}
+        });
+
         if (!response || response.error || !response.dataUrl) {
           showToast('Capture Failed', response ? response.error : 'No data returned', '❌');
           return;

@@ -65,52 +65,29 @@ snipBtn?.addEventListener('click', async () => {
 
 // 2. Capture Full Visible Viewport to Clipboard
 captureScreenBtn?.addEventListener('click', async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab || !tab.id) return;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.id) return;
 
-  if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
-    alert('Cannot screenshot browser internal pages.');
-    return;
-  }
-
-  const originalHTML = captureScreenBtn.innerHTML;
-  captureScreenBtn.innerHTML = '<span>⏳</span> Capturing...';
-  captureScreenBtn.disabled = true;
-
-  chrome.runtime.sendMessage({ action: 'CAPTURE_VISIBLE_TAB' }, async (response) => {
-    if (response && response.dataUrl) {
-      try {
-        const res = await fetch(response.dataUrl);
-        const blob = await res.blob();
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        captureScreenBtn.innerHTML = '<span>✅</span> Copied!';
-
-        const storage = await chrome.storage.local.get([PREF_KEY_DOWNLOAD]);
-        if (storage[PREF_KEY_DOWNLOAD]) {
-          const a = document.createElement('a');
-          a.href = response.dataUrl;
-          a.download = `screenshot_${Date.now()}.png`;
-          a.click();
-          captureScreenBtn.innerHTML = '<span>💾</span> Copied & Saved!';
-        }
-      } catch (err) {
-        console.warn('[Popup] Direct clipboard write failed, downloading...', err);
-        const a = document.createElement('a');
-        a.href = response.dataUrl;
-        a.download = `screenshot_${Date.now()}.png`;
-        a.click();
-        captureScreenBtn.innerHTML = '<span>💾</span> Downloaded!';
-      }
-    } else {
-      captureScreenBtn.innerHTML = '<span>❌</span> Failed';
+    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:') || tab.url.startsWith('https://chrome.google.com/webstore')) {
+      alert('Cannot run screenshot tools on browser system pages.');
+      return;
     }
 
-    setTimeout(() => {
-      captureScreenBtn.innerHTML = originalHTML;
-      captureScreenBtn.disabled = false;
-    }, 2000);
-  });
+    // Inject universal_visible.js into current page
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['universal_visible.js']
+    });
+
+    // Close popup immediately so the UI panel vanishes and doesn't appear in the screenshot
+    window.close();
+  } catch (err) {
+    console.error('[Popup] Failed to start visible screen capture:', err);
+    alert('Could not start screen capture: ' + (err.message || String(err)));
+  }
 });
+
 
 // Manage download preference checkbox
 const PREF_KEY_DOWNLOAD = 'gemini_auto_download_pref';

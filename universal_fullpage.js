@@ -101,15 +101,43 @@
     });
   }
 
-  // Safe capture that completely hides the HUD so it NEVER appears in the screenshot!
+  // Safe capture that completely hides the HUD and any floating helper panels so they NEVER appear in the screenshot!
   async function safeCaptureTab() {
-    hud.style.display = 'none';
-    await new Promise((r) => requestAnimationFrame(r));
+    hud.style.setProperty('display', 'none', 'important');
+    hud.style.setProperty('visibility', 'hidden', 'important');
+    hud.style.setProperty('opacity', '0', 'important');
+
+    // Also hide any on-page panels or banners
+    const extraHide = [];
+    ['#gemini-helper-panel', '.quick-btn-group', '.gemini-screenshot-btn-container', '#gemini-lens-snip-banner', '#gemini-lens-toast-container'].forEach(sel => {
+      try {
+        document.querySelectorAll(sel).forEach(el => {
+          if (el && el.style.display !== 'none') {
+            const orig = el.style.display;
+            el.style.setProperty('display', 'none', 'important');
+            extraHide.push({ el, orig });
+          }
+        });
+      } catch (e) {}
+    });
+
+    // Wait 2 animation frames + 60ms delay to guarantee Chrome GPU compositor has painted the frame with HUD completely gone!
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await sleep(60);
+
     try {
       const dataUrl = await captureTab();
       return dataUrl;
     } finally {
-      hud.style.display = 'flex';
+      hud.style.removeProperty('display');
+      hud.style.removeProperty('visibility');
+      hud.style.removeProperty('opacity');
+      extraHide.forEach(({ el, orig }) => {
+        try {
+          if (orig) el.style.display = orig;
+          else el.style.removeProperty('display');
+        } catch (e) {}
+      });
     }
   }
 
@@ -127,6 +155,18 @@
 
   // Hide sticky and fixed elements so they don't duplicate down the page
   function hideFloatingAndSticky() {
+    // Explicitly hide any Gemini helper panels or toolbars
+    ['#gemini-helper-panel', '.quick-btn-group', '.gemini-screenshot-btn-container', '[id*="gemini-helper"]', '[class*="gemini-helper"]'].forEach(sel => {
+      try {
+        document.querySelectorAll(sel).forEach(el => {
+          if (!el.classList.contains('gemini-lens-hide-fixed')) {
+            el.classList.add('gemini-lens-hide-fixed');
+            hiddenFixed.push(el);
+          }
+        });
+      } catch (e) {}
+    });
+
     document.querySelectorAll('*').forEach((el) => {
       if (el === hud || hud.contains(el)) return;
       try {

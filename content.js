@@ -459,8 +459,8 @@
     const scrollContainer = getScrollParent(card);
     const initialScrollTop = getScrollTop(scrollContainer);
     
-    // Hide the button container immediately to prevent it from rendering in the screenshot
-    container.style.display = 'none';
+    // Hide all screenshot button containers immediately to prevent them from rendering in the screenshot
+    document.querySelectorAll('.gemini-screenshot-btn-container').forEach(el => el.style.display = 'none');
     
     // Disable smooth scroll temporarily for precise and instant layout alignment
     const originalScrollBehavior = scrollContainer.style.scrollBehavior;
@@ -476,6 +476,15 @@
     try {
       // Find all top/bottom overlay/fixed elements that should be hidden
       const bottomSelectors = [
+        '#gemini-helper-panel',
+        '.quick-btn-group',
+        '#gemini-helper-container',
+        '[id*="gemini-helper"]',
+        '[class*="gemini-helper"]',
+        '.gemini-screenshot-btn-container',
+        '#gemini-lens-fullpage-hud',
+        '#gemini-lens-snip-banner',
+        '#gemini-lens-toast-container',
         'input-container',
         '[data-test-id="chat-input-container"]',
         'footer',
