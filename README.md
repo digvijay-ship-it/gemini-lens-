@@ -11,6 +11,9 @@ A feature-packed, lightweight Chrome Extension designed for **Google Gemini** (`
 - 📋 **Direct-to-Clipboard & Auto-Download**: Automatically copies captured screenshots to your clipboard so you can paste (`Ctrl + V`) immediately into Discord, Slack, WhatsApp, or image editors.
 - 🍞 **Floating Toast Notifications**: Instant visual feedback on clipboard copy and downloads.
 - ↔️ **Dynamic Conversation Width Controller**: Easily expand Gemini's narrow default width (860px) to Wide (1100px), Ultra (1400px), Max (1600px), or Full Screen (96vw) using the extension popup menu or smooth custom slider.
+- ⚡ **Smart Enter & Queue on Upload**: Automatically queues your message if you press Enter while an image is still uploading, and auto-submits the moment upload finishes.
+- 🧹 **Auto-Clear Stuck Attachments**: Automatically purges and unmounts lingering image attachments from the input box once your prompt is dispatched.
+- 🎯 **Paste Focus-Loss Fix**: Keeps typing focus strictly on the text editor after pasting images, preventing lost keystrokes.
 - 🚫 **Cleaner Chat Interface**: Automatically hides the bottom AI hallucination disclaimer to reclaim vertical screen space.
 - 🎨 **Minimal Hover Trigger**: A compact 32px floating camera icon that expands on hover, preventing button overlay clutter over response headers.
 

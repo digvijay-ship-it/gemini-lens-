@@ -1035,6 +1035,230 @@
     });
   }
 
+  // =========================================================================
+  // SMART INPUT & ATTACHMENT CONTROLLER
+  // (Enter queue on upload + paste focus-loss fix + stuck attachment auto-clear)
+  // =========================================================================
+  function initInputHelper() {
+    let enterQueued = false;
+
+    function hasAttachment() {
+      return !!(
+        document.querySelector('gem-media-attachment') ||
+        document.querySelector('.gem-attachment-container') ||
+        document.querySelector('.xap-uploader-dropzone img') ||
+        document.querySelector('img[src^="blob:"]')
+      );
+    }
+
+    function isUploading() {
+      const area = document.querySelector('.xap-uploader-dropzone');
+      if (area?.querySelector('.mdc-circular-progress--indeterminate, .mdc-circular-progress, mat-progress-spinner, mat-spinner, [role="progressbar"]')) {
+        return true;
+      }
+      const img = document.querySelector('img.gem-attachment-style-img, .xap-uploader-dropzone img');
+      if (img && (img.naturalWidth === 0 || !img.complete)) {
+        return true;
+      }
+      return false;
+    }
+
+    function findSubmitButton() {
+      return document.querySelector(
+        'button[aria-label="Send message"], button[aria-label*="Send" i], button[aria-label*="Submit" i], .send-button'
+      );
+    }
+
+    // Force clear any attachment remnants stuck in the input area
+    function clearStuckAttachment() {
+      const attachments = document.querySelectorAll(
+        'gem-media-attachment, .gem-attachment-container, .xap-uploader-dropzone'
+      );
+      attachments.forEach((att) => {
+        // Attempt to find and click the native cancel/delete button inside the thumbnail
+        const removeBtn = att.querySelector(
+          'button[aria-label*="Remove" i], button[aria-label*="Delete" i], button[aria-label*="Clear" i], button[aria-label*="Close" i], .close-button, .delete-button, button.remove-btn'
+        );
+        if (removeBtn) {
+          console.log('[GeminiLens] Clicking attachment remove button.');
+          removeBtn.click();
+        } else if (att.tagName.toLowerCase() === 'gem-media-attachment') {
+          console.log('[GeminiLens] Removing orphaned gem-media-attachment.');
+          att.remove();
+        }
+      });
+
+      // Clear any blob image tags inside Quill editor if lingering
+      const editor = document.querySelector('div.ql-editor[contenteditable="true"]');
+      if (editor) {
+        const blobImgs = editor.querySelectorAll('img[src^="blob:"]');
+        blobImgs.forEach((img) => img.remove());
+      }
+
+      resetStuckUploaderHeight();
+    }
+
+    function scheduleAttachmentCleanup() {
+      let checks = 0;
+      const cleanupInterval = setInterval(() => {
+        checks++;
+        // If an attachment is still lingering after submitting, clear it
+        if (hasAttachment()) {
+          clearStuckAttachment();
+        }
+        if (checks >= 8 || !hasAttachment()) {
+          clearInterval(cleanupInterval);
+          resetStuckUploaderHeight();
+        }
+      }, 250);
+    }
+
+    function retrySubmit() {
+      let attempts = 0;
+      const retry = setInterval(() => {
+        attempts++;
+        if (!enterQueued) {
+          clearInterval(retry);
+          return;
+        }
+        const btn = findSubmitButton();
+        if (btn && !btn.disabled) {
+          btn.click();
+          enterQueued = false;
+          clearInterval(retry);
+          console.log('[GeminiLens] Submitted queued message.');
+          scheduleAttachmentCleanup();
+          return;
+        }
+        if (attempts > 25) {
+          enterQueued = false;
+          clearInterval(retry);
+          console.warn('[GeminiLens] Submit button remained disabled.');
+        }
+      }, 150);
+    }
+
+    function pollForUploadDone() {
+      let elapsed = 0;
+      const poll = setInterval(() => {
+        elapsed += 100;
+        if (!enterQueued) {
+          clearInterval(poll);
+          return;
+        }
+        if (!isUploading()) {
+          clearInterval(poll);
+          console.log('[GeminiLens] Image upload complete — submitting.');
+          retrySubmit();
+          return;
+        }
+        if (elapsed > 35000) {
+          enterQueued = false;
+          clearInterval(poll);
+          console.warn('[GeminiLens] Upload timeout.');
+        }
+      }, 100);
+    }
+
+    // Intercept Enter key
+    document.addEventListener(
+      'keydown',
+      function (e) {
+        if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
+        const active = document.activeElement;
+        const inInput =
+          active?.tagName === 'TEXTAREA' ||
+          active?.getAttribute('contenteditable') === 'true' ||
+          active?.closest('[contenteditable="true"]') ||
+          active?.closest('.xap-uploader-dropzone') ||
+          active?.closest('input-area-v2');
+        if (!inInput) return;
+
+        if (hasAttachment() && isUploading()) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!enterQueued) {
+            enterQueued = true;
+            console.log('[GeminiLens] Enter queued while image is uploading.');
+            pollForUploadDone();
+          }
+        } else {
+          // Normal Enter send - schedule cleanup to make sure attachment doesn't get stuck
+          setTimeout(scheduleAttachmentCleanup, 200);
+        }
+      },
+      true
+    );
+
+    // Also monitor manual clicks on the Send button
+    document.addEventListener(
+      'click',
+      (e) => {
+        const sendBtn = e.target.closest(
+          'button[aria-label*="Send" i], button[aria-label*="Submit" i], .send-button'
+        );
+        if (sendBtn) {
+          setTimeout(scheduleAttachmentCleanup, 200);
+        }
+      },
+      true
+    );
+
+    // Paste focus-loss fix
+    function getInputField() {
+      return (
+        document.querySelector('div.ql-editor[contenteditable="true"]') ||
+        document.querySelector('[contenteditable="true"]')
+      );
+    }
+
+    function refocusInput(input) {
+      if (!input) return;
+      input.focus();
+      try {
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(input);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (err) {
+        // fallback
+      }
+    }
+
+    document.addEventListener(
+      'paste',
+      () => {
+        const input = getInputField();
+        if (!input) return;
+
+        let tries = 0;
+        const refocus = setInterval(() => {
+          tries++;
+          if (document.activeElement !== input) {
+            refocusInput(input);
+          }
+          if (tries > 12) clearInterval(refocus);
+        }, 80);
+      },
+      true
+    );
+
+    // Reset stuck --uploader-height gap
+    function resetStuckUploaderHeight() {
+      if (hasAttachment()) return;
+      document.querySelectorAll('input-area-v2, .ql-editor').forEach((el) => {
+        const current = el.style.getPropertyValue('--uploader-height');
+        if (current && current !== '0px') {
+          el.style.setProperty('--uploader-height', '0px');
+        }
+      });
+    }
+
+    setInterval(resetStuckUploaderHeight, 500);
+  }
+
   // Detect and inject cards
   function initObserver() {
     // Clean up disclaimers on load
@@ -1042,6 +1266,9 @@
 
     // Load and apply initial width preference
     loadSavedWidth();
+
+    // Initialize Smart Input & Attachment controller
+    initInputHelper();
 
     // Inject into existing cards
     const cards = document.querySelectorAll('model-response');
