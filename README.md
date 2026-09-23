@@ -6,6 +6,7 @@ A feature-packed, lightweight Chrome Extension designed for **Google Gemini** (`
 
 ## ✨ Features
 
+- 📜 **True Full Page Auto-Scroll & Stitch (GoFullPage Style)**: Automatically scrolls down the entire webpage from top to bottom, hides duplicate fixed/sticky headers during scrolling, stitches all slices on an offscreen canvas, copies directly to clipboard, and downloads the full image.
 - 🌐 **Universal Element Snipping (Any Website!)**: Click "Snip Element" in the toolbar popup to hover and capture paragraphs, tables, images, or code blocks on **any website** (Wikipedia, Twitter/X, GitHub, Blogs, Docs).
 - 📸 **1-Click Full Response Screenshot**: Captures the entire long Gemini response card seamlessly using viewport scrolling, container bounds clipping, and pixel-perfect delta stitching.
 - 🎯 **Granular Element Selection (Snipping Mode)**: Hover over and capture individual paragraphs, list items (`<li>`), tables, or code snippets with glowing purple outlines.
@@ -46,13 +47,14 @@ gemini-screenshot-extension/
 │   ├── icon32.png
 │   ├── icon48.png
 │   └── icon128.png
-├── background.js       # Background service worker (GPU viewport capture)
-├── content.js          # Gemini DOM injector, scroll stitcher, element selector & width CSS
-├── universal_snip.js   # Universal on-demand element snipper for any webpage
-├── generate_icons.py   # High-resolution icon generator
-├── manifest.json       # Chrome Manifest V3 configuration
-├── popup.html          # Toolbar popup UI (universal tools & Gemini controls)
-├── popup.js            # Toolbar popup script (tab messaging & dynamic script injection)
+├── background.js           # Background service worker (rate-limited GPU viewport capture)
+├── content.js              # Gemini DOM injector, scroll stitcher, element selector & width CSS
+├── universal_fullpage.js   # True full-page auto-scroll and stitch engine (GoFullPage style)
+├── universal_snip.js       # Universal on-demand element snipper for any webpage
+├── generate_icons.py       # High-resolution icon generator
+├── manifest.json           # Chrome Manifest V3 configuration
+├── popup.html              # Toolbar popup UI (universal tools & Gemini controls)
+├── popup.js                # Toolbar popup script (tab messaging & dynamic script injection)
 ├── .gitignore
 └── README.md
 ```

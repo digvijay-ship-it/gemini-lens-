@@ -4,6 +4,7 @@ const STORAGE_KEY = 'gemini_chat_width_pref';
 const widthLabel = document.getElementById('current-width-label');
 const slider = document.getElementById('width-slider');
 const presetBtns = document.querySelectorAll('.preset-btn');
+const fullPageBtn = document.getElementById('btn-fullpage-scroll');
 const snipBtn = document.getElementById('btn-snip-element');
 const captureScreenBtn = document.getElementById('btn-capture-screen');
 const widthSection = document.getElementById('gemini-width-section');
@@ -11,6 +12,31 @@ const widthSection = document.getElementById('gemini-width-section');
 // =========================================================================
 // UNIVERSAL SCREENSHOT ACTIONS (ANY WEBSITE)
 // =========================================================================
+
+// 0. Full Page Auto-Scroll & Stitch (GoFullPage-style full webpage capture)
+fullPageBtn?.addEventListener('click', async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.id) return;
+
+    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
+      alert('Cannot run screenshot tools on browser system pages.');
+      return;
+    }
+
+    // Inject universal_fullpage.js into current page
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['universal_fullpage.js']
+    });
+
+    // Close popup so the page can scroll and show progress HUD
+    window.close();
+  } catch (err) {
+    console.error('[Popup] Failed to start full page capture:', err);
+    alert('Could not start full-page capture: ' + (err.message || String(err)));
+  }
+});
 
 // 1. Snip Any Element on the active tab
 snipBtn?.addEventListener('click', async () => {
