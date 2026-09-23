@@ -10,6 +10,13 @@
   const originalScrollX = window.scrollX;
   const originalScrollY = window.scrollY;
 
+  // Read user preference for download
+  let shouldDownload = false;
+  try {
+    const res = await chrome.storage.local.get(['gemini_auto_download_pref']);
+    shouldDownload = !!res.gemini_auto_download_pref;
+  } catch (e) {}
+
   // 1. Inject temporary styles for clean capture
   const styleEl = document.createElement('style');
   styleEl.id = 'gemini-lens-fullpage-temp-style';
@@ -31,6 +38,7 @@
     .gemini-lens-hide-fixed {
       visibility: hidden !important;
       opacity: 0 !important;
+      transition: none !important;
     }
   `;
   document.head.appendChild(styleEl);
@@ -93,6 +101,18 @@
     });
   }
 
+  // Safe capture that completely hides the HUD so it NEVER appears in the screenshot!
+  async function safeCaptureTab() {
+    hud.style.display = 'none';
+    await new Promise((r) => requestAnimationFrame(r));
+    try {
+      const dataUrl = await captureTab();
+      return dataUrl;
+    } finally {
+      hud.style.display = 'flex';
+    }
+  }
+
   function loadImage(src) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -102,28 +122,23 @@
     });
   }
 
-  // Find and temporarily convert sticky elements to relative
   const modifiedSticky = [];
-  document.querySelectorAll('*').forEach((el) => {
-    try {
-      const pos = window.getComputedStyle(el).position;
-      if (pos === 'sticky') {
-        modifiedSticky.push({ el, original: el.style.position });
-        el.style.setProperty('position', 'relative', 'important');
-      }
-    } catch (e) {}
-  });
-
   const hiddenFixed = [];
 
-  function hideFixedElements() {
+  // Hide sticky and fixed elements so they don't duplicate down the page
+  function hideFloatingAndSticky() {
     document.querySelectorAll('*').forEach((el) => {
       if (el === hud || hud.contains(el)) return;
       try {
         const comp = window.getComputedStyle(el);
         if (comp.position === 'fixed') {
-          el.classList.add('gemini-lens-hide-fixed');
-          hiddenFixed.push(el);
+          if (!el.classList.contains('gemini-lens-hide-fixed')) {
+            el.classList.add('gemini-lens-hide-fixed');
+            hiddenFixed.push(el);
+          }
+        } else if (comp.position === 'sticky') {
+          modifiedSticky.push({ el, original: el.style.position });
+          el.style.setProperty('position', 'relative', 'important');
         }
       } catch (e) {}
     });
@@ -151,8 +166,8 @@
     window.scrollTo(0, 0);
     await sleep(350);
 
-    // Initial capture
-    const firstDataUrl = await captureTab();
+    // Initial capture (includes header for top slice)
+    const firstDataUrl = await safeCaptureTab();
     const firstImg = await loadImage(firstDataUrl);
 
     // Device Pixel Ratio scaling factor
@@ -183,8 +198,8 @@
 
     updateProgress((viewportHeight / fullHeight) * 100);
 
-    // Now hide fixed elements so they don't repeat on subsequent scroll steps
-    hideFixedElements();
+    // Immediately hide fixed and sticky headers so they don't repeat on subsequent scroll steps
+    hideFloatingAndSticky();
 
     let currentY = viewportHeight;
     const maxSteps = Math.min(Math.ceil(fullHeight / viewportHeight) + 2, 50);
@@ -193,12 +208,15 @@
     while (currentY < fullHeight && stepCount < maxSteps) {
       stepCount++;
       window.scrollTo(0, currentY);
-      await sleep(380); // Wait for repaint
+      await sleep(400); // Wait for repaint
+
+      // Re-apply to catch any dynamic sticky/fixed bars added on scroll (e.g. Google search bar)
+      hideFloatingAndSticky();
 
       const actualScrollY = window.scrollY;
       const isAtBottom = actualScrollY + viewportHeight >= fullHeight;
 
-      const dataUrl = await captureTab();
+      const dataUrl = await safeCaptureTab();
       const img = await loadImage(dataUrl);
 
       if (isAtBottom) {
@@ -231,13 +249,14 @@
     hud.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #4ade80;">
         <span style="font-size: 16px;">✅</span>
-        <span>Full Page Copied & Saved!</span>
+        <span>${shouldDownload ? 'Full Page Copied & Saved!' : 'Full Page Copied to Clipboard!'}</span>
       </div>
-      <div style="font-size: 11px; color: #d1d5db;">Clipboard ready (Ctrl+V) & Downloaded</div>
+      <div style="font-size: 11px; color: #d1d5db;">${shouldDownload ? 'Clipboard ready (Ctrl+V) & Downloaded' : 'Ready to paste anywhere (Ctrl+V)'}</div>
     `;
 
     canvas.toBlob(async (blob) => {
       if (blob) {
+        // 1. Always copy to clipboard
         try {
           const item = new ClipboardItem({ 'image/png': blob });
           await navigator.clipboard.write([item]);
@@ -246,12 +265,14 @@
           console.warn('[Gemini Lens] Clipboard write blocked:', clipErr);
         }
 
-        // Auto-download file
-        const cleanTitle = (document.title || 'webpage').replace(/[^a-z0-9_-]/gi, '_').substring(0, 40);
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `${cleanTitle}_fullpage_${Date.now()}.png`;
-        a.click();
+        // 2. Only download if user enabled the download checkbox!
+        if (shouldDownload) {
+          const cleanTitle = (document.title || 'webpage').replace(/[^a-z0-9_-]/gi, '_').substring(0, 40);
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `${cleanTitle}_fullpage_${Date.now()}.png`;
+          a.click();
+        }
       }
     }, 'image/png');
 
@@ -274,7 +295,7 @@
       el.classList.remove('gemini-lens-hide-fixed');
     });
 
-    // Restore original scroll
+    // Restore original scroll position
     window.scrollTo(originalScrollX, originalScrollY);
 
     setTimeout(() => {

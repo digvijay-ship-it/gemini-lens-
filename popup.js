@@ -84,6 +84,15 @@ captureScreenBtn?.addEventListener('click', async () => {
         const blob = await res.blob();
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
         captureScreenBtn.innerHTML = '<span>✅</span> Copied!';
+
+        const storage = await chrome.storage.local.get([PREF_KEY_DOWNLOAD]);
+        if (storage[PREF_KEY_DOWNLOAD]) {
+          const a = document.createElement('a');
+          a.href = response.dataUrl;
+          a.download = `screenshot_${Date.now()}.png`;
+          a.click();
+          captureScreenBtn.innerHTML = '<span>💾</span> Copied & Saved!';
+        }
       } catch (err) {
         console.warn('[Popup] Direct clipboard write failed, downloading...', err);
         const a = document.createElement('a');
@@ -101,6 +110,20 @@ captureScreenBtn?.addEventListener('click', async () => {
       captureScreenBtn.disabled = false;
     }, 2000);
   });
+});
+
+// Manage download preference checkbox
+const PREF_KEY_DOWNLOAD = 'gemini_auto_download_pref';
+const autoDownloadChk = document.getElementById('chk-auto-download');
+
+chrome.storage.local.get([PREF_KEY_DOWNLOAD], (res) => {
+  if (autoDownloadChk) {
+    autoDownloadChk.checked = !!res[PREF_KEY_DOWNLOAD];
+  }
+});
+
+autoDownloadChk?.addEventListener('change', (e) => {
+  chrome.storage.local.set({ [PREF_KEY_DOWNLOAD]: e.target.checked });
 });
 
 // =========================================================================

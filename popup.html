@@ -209,6 +209,70 @@
       transform: translateY(1px);
     }
 
+    .setting-card {
+      background: #202227;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 9px 12px;
+      margin-top: 4px;
+      grid-column: span 2;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: border-color 0.2s ease;
+    }
+
+    .setting-card:hover {
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+
+    .toggle-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #f3e8ff;
+      user-select: none;
+    }
+
+    .toggle-control input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 15px;
+      height: 15px;
+      background: #2a2c33;
+      border: 1.5px solid #a855f7;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .toggle-control input[type="checkbox"]:checked {
+      background: #a855f7;
+    }
+
+    .toggle-control input[type="checkbox"]:checked::after {
+      content: '✓';
+      position: absolute;
+      top: -2px;
+      left: 2px;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .toggle-subtext {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-left: 23px;
+      line-height: 1.2;
+    }
+
     .info-card {
       background: rgba(168, 85, 247, 0.06);
       border: 1px solid rgba(168, 85, 247, 0.2);
@@ -260,6 +324,15 @@
       <button class="action-btn" id="btn-capture-screen" title="Instant visible screen snapshot to clipboard">
         <span>📷</span> Visible Screen
       </button>
+
+      <!-- User Option: Also Download PNG Checkbox -->
+      <div class="setting-card">
+        <label class="toggle-control" title="Check this if you also want screenshots to save as PNG files">
+          <input type="checkbox" id="chk-auto-download">
+          <span class="toggle-text">💾 Also download PNG file</span>
+        </label>
+        <div class="toggle-subtext">Default: Copies directly to Clipboard only (Ctrl + V)</div>
+      </div>
     </div>
   </div>
 

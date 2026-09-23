@@ -233,17 +233,26 @@
                 return;
               }
 
+              let isCopied = false;
               try {
                 const item = new ClipboardItem({ 'image/png': blob });
                 await navigator.clipboard.write([item]);
+                isCopied = true;
                 showToast('Copied to Clipboard!', 'Ready to paste anywhere (Ctrl + V)', '📋');
               } catch (clipErr) {
-                console.warn('[Gemini Lens] Direct clipboard write blocked, downloading instead...', clipErr);
+                console.warn('[Gemini Lens] Direct clipboard write blocked, downloading fallback...', clipErr);
+              }
+
+              // Check user download preference
+              const prefs = await chrome.storage.local.get(['gemini_auto_download_pref']);
+              if (prefs.gemini_auto_download_pref || !isCopied) {
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = `screenshot_${Date.now()}.png`;
+                a.download = `snip_${Date.now()}.png`;
                 a.click();
-                showToast('Screenshot Downloaded!', 'Saved PNG to your Downloads', '💾');
+                if (prefs.gemini_auto_download_pref && isCopied) {
+                  showToast('Copied & Downloaded!', 'Saved PNG to Downloads', '💾');
+                }
               }
             }, 'image/png');
           } catch (err) {
