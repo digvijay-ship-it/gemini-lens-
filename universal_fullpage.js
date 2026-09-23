@@ -101,43 +101,16 @@
     });
   }
 
-  // Safe capture that completely hides the HUD and any floating helper panels so they NEVER appear in the screenshot!
-  async function safeCaptureTab() {
+  // Clean capture used ONLY for the final bottom slice so HUD never blinks during scrolling
+  async function captureCleanSlice() {
     hud.style.setProperty('display', 'none', 'important');
-    hud.style.setProperty('visibility', 'hidden', 'important');
-    hud.style.setProperty('opacity', '0', 'important');
-
-    // Also hide any on-page panels or banners
-    const extraHide = [];
-    ['#gemini-helper-panel', '.quick-btn-group', '.gemini-screenshot-btn-container', '#gemini-lens-snip-banner', '#gemini-lens-toast-container'].forEach(sel => {
-      try {
-        document.querySelectorAll(sel).forEach(el => {
-          if (el && el.style.display !== 'none') {
-            const orig = el.style.display;
-            el.style.setProperty('display', 'none', 'important');
-            extraHide.push({ el, orig });
-          }
-        });
-      } catch (e) {}
-    });
-
-    // Wait 2 animation frames + 60ms delay to guarantee Chrome GPU compositor has painted the frame with HUD completely gone!
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await sleep(60);
-
+    await sleep(40);
     try {
       const dataUrl = await captureTab();
       return dataUrl;
     } finally {
       hud.style.removeProperty('display');
-      hud.style.removeProperty('visibility');
-      hud.style.removeProperty('opacity');
-      extraHide.forEach(({ el, orig }) => {
-        try {
-          if (orig) el.style.display = orig;
-          else el.style.removeProperty('display');
-        } catch (e) {}
-      });
     }
   }
 
@@ -206,8 +179,11 @@
     window.scrollTo(0, 0);
     await sleep(350);
 
-    // Initial capture (includes header for top slice)
-    const firstDataUrl = await safeCaptureTab();
+    const hudRect = hud.getBoundingClientRect();
+    const safeSliceH = Math.max(100, Math.floor((hudRect.top > 0 ? hudRect.top : viewportHeight - 80) - 16));
+
+    // Initial capture (HUD stays 100% visible on screen!)
+    const firstDataUrl = fullHeight <= viewportHeight ? await captureCleanSlice() : await captureTab();
     const firstImg = await loadImage(firstDataUrl);
 
     // Device Pixel Ratio scaling factor
@@ -228,59 +204,73 @@
     ctx.fillStyle = bodyBg && bodyBg !== 'transparent' && !bodyBg.includes('rgba(0, 0, 0, 0)') ? bodyBg : '#ffffff';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw first slice
-    const firstSliceH = Math.min(viewportHeight, fullHeight);
-    ctx.drawImage(
-      firstImg,
-      0, 0, firstImg.width, Math.round(firstSliceH * scale),
-      0, 0, canvasWidth, Math.round(firstSliceH * scale)
-    );
+    if (fullHeight <= viewportHeight) {
+      ctx.drawImage(firstImg, 0, 0, canvasWidth, canvasHeight);
+    } else {
+      // Draw first slice strictly above the HUD so HUD never appears in screenshot
+      const firstDrawH = Math.min(safeSliceH, fullHeight);
+      ctx.drawImage(
+        firstImg,
+        0, 0, firstImg.width, Math.round(firstDrawH * scale),
+        0, 0, canvasWidth, Math.round(firstDrawH * scale)
+      );
+    }
 
-    updateProgress((viewportHeight / fullHeight) * 100);
+    updateProgress((Math.min(safeSliceH, fullHeight) / fullHeight) * 100);
 
     // Immediately hide fixed and sticky headers so they don't repeat on subsequent scroll steps
     hideFloatingAndSticky();
 
-    let currentY = viewportHeight;
-    const maxSteps = Math.min(Math.ceil(fullHeight / viewportHeight) + 2, 50);
+    let currentY = fullHeight <= viewportHeight ? fullHeight : safeSliceH;
+    const maxSteps = Math.min(Math.ceil(fullHeight / safeSliceH) + 2, 60);
     let stepCount = 0;
 
     while (currentY < fullHeight && stepCount < maxSteps) {
       stepCount++;
       window.scrollTo(0, currentY);
-      await sleep(400); // Wait for repaint
+      await sleep(350); // Wait for repaint
 
       // Re-apply to catch any dynamic sticky/fixed bars added on scroll (e.g. Google search bar)
       hideFloatingAndSticky();
 
       const actualScrollY = window.scrollY;
-      const isAtBottom = actualScrollY + viewportHeight >= fullHeight;
-
-      const dataUrl = await safeCaptureTab();
-      const img = await loadImage(dataUrl);
+      const isAtBottom = actualScrollY + viewportHeight >= fullHeight - 2;
 
       if (isAtBottom) {
-        // Last slice: calculate delta so bottom isn't duplicated
+        // Last slice: capture clean bottom without HUD
+        const lastDataUrl = await captureCleanSlice();
+        const lastImg = await loadImage(lastDataUrl);
+
         const remainingH = fullHeight - currentY;
-        const sourceY = Math.max(0, (viewportHeight - remainingH) * scale);
-        const sourceH = Math.min(remainingH * scale, img.height - sourceY);
+        const sourceY = Math.max(0, Math.round((viewportHeight - remainingH) * scale));
+        const sourceH = Math.min(Math.round(remainingH * scale), lastImg.height - sourceY);
         const destY = Math.min(Math.round(currentY * scale), canvasHeight - 1);
-        const destH = Math.min(Math.round(remainingH * scale), canvasHeight - destY);
+        const destH = Math.min(sourceH, canvasHeight - destY);
 
         if (sourceH > 0 && destH > 0) {
-          ctx.drawImage(img, 0, sourceY, img.width, sourceH, 0, destY, canvasWidth, destH);
+          ctx.drawImage(lastImg, 0, sourceY, lastImg.width, sourceH, 0, destY, canvasWidth, destH);
         }
         break;
       } else {
-        const destY = Math.round(actualScrollY * scale);
-        const destH = Math.round(viewportHeight * scale);
-        if (destY < canvasHeight) {
-          ctx.drawImage(img, 0, 0, img.width, img.height, 0, destY, canvasWidth, Math.min(destH, canvasHeight - destY));
-        }
-      }
+        // Intermediate slice: HUD stays 100% visible on screen without blinking!
+        const dataUrl = await captureTab();
+        const img = await loadImage(dataUrl);
 
-      currentY += viewportHeight;
-      updateProgress((Math.min(currentY, fullHeight) / fullHeight) * 100);
+        const sliceH = Math.min(safeSliceH, fullHeight - currentY);
+        const destY = Math.round(currentY * scale);
+        const destH = Math.round(sliceH * scale);
+
+        if (destY < canvasHeight) {
+          ctx.drawImage(
+            img,
+            0, 0, img.width, Math.round(sliceH * scale),
+            0, destY, canvasWidth, Math.min(destH, canvasHeight - destY)
+          );
+        }
+
+        currentY += safeSliceH;
+        updateProgress((Math.min(currentY, fullHeight) / fullHeight) * 100);
+      }
     }
 
     updateProgress(100);
