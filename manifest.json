@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Gemini Lens - Card Screenshot & Width Helper",
-  "version": "1.0",
-  "description": "1-click GPU full response screenshots with auto-stitching, element snip mode & custom conversation width controller.",
+  "name": "Gemini Lens - Universal Screenshot & Width Helper",
+  "version": "2.0",
+  "description": "Universal 1-click element snipper for any website, GPU response screenshot auto-stitching & Gemini custom width controller.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -20,7 +20,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Gemini Helper & Width Controller",
+    "default_title": "Gemini Lens - Universal Screenshot & Helper",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

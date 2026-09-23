@@ -1,14 +1,97 @@
-// popup.js - Gemini Helper Extension Popup
+// popup.js - Gemini Lens & Universal Screenshot Popup
 
 const STORAGE_KEY = 'gemini_chat_width_pref';
 const widthLabel = document.getElementById('current-width-label');
 const slider = document.getElementById('width-slider');
 const presetBtns = document.querySelectorAll('.preset-btn');
+const snipBtn = document.getElementById('btn-snip-element');
+const captureScreenBtn = document.getElementById('btn-capture-screen');
+const widthSection = document.getElementById('gemini-width-section');
 
-// Update popup UI
-function updateUI(widthVal) {
+// =========================================================================
+// UNIVERSAL SCREENSHOT ACTIONS (ANY WEBSITE)
+// =========================================================================
+
+// 1. Snip Any Element on the active tab
+snipBtn?.addEventListener('click', async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.id) return;
+
+    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
+      alert('Cannot run screenshot tools on browser system pages.');
+      return;
+    }
+
+    // Inject universal_snip.js into current page
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['universal_snip.js']
+    });
+
+    // Close popup so the user can immediately click any element on the page
+    window.close();
+  } catch (err) {
+    console.error('[Popup] Failed to inject snipper:', err);
+    alert('Could not start snipping on this tab: ' + (err.message || String(err)));
+  }
+});
+
+// 2. Capture Full Visible Viewport to Clipboard
+captureScreenBtn?.addEventListener('click', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !tab.id) return;
+
+  if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
+    alert('Cannot screenshot browser internal pages.');
+    return;
+  }
+
+  const originalHTML = captureScreenBtn.innerHTML;
+  captureScreenBtn.innerHTML = '<span>⏳</span> Capturing...';
+  captureScreenBtn.disabled = true;
+
+  chrome.runtime.sendMessage({ action: 'CAPTURE_VISIBLE_TAB' }, async (response) => {
+    if (response && response.dataUrl) {
+      try {
+        const res = await fetch(response.dataUrl);
+        const blob = await res.blob();
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        captureScreenBtn.innerHTML = '<span>✅</span> Copied!';
+      } catch (err) {
+        console.warn('[Popup] Direct clipboard write failed, downloading...', err);
+        const a = document.createElement('a');
+        a.href = response.dataUrl;
+        a.download = `screenshot_${Date.now()}.png`;
+        a.click();
+        captureScreenBtn.innerHTML = '<span>💾</span> Downloaded!';
+      }
+    } else {
+      captureScreenBtn.innerHTML = '<span>❌</span> Failed';
+    }
+
+    setTimeout(() => {
+      captureScreenBtn.innerHTML = originalHTML;
+      captureScreenBtn.disabled = false;
+    }, 2000);
+  });
+});
+
+// =========================================================================
+// GEMINI SPECIFIC CHAT WIDTH CONTROLLER
+// =========================================================================
+
+function updateUI(widthVal, isGemini = true) {
   if (widthLabel) {
-    widthLabel.textContent = widthVal === 'default' ? 'Default (860px)' : (widthVal === '96vw' ? 'Full (96%)' : widthVal);
+    if (!isGemini) {
+      widthLabel.textContent = 'Gemini Only';
+      widthLabel.style.color = '#9ca3af';
+      widthLabel.style.background = 'rgba(255, 255, 255, 0.08)';
+    } else {
+      widthLabel.textContent = widthVal === 'default' ? 'Default (860px)' : (widthVal === '96vw' ? 'Full (96%)' : widthVal);
+      widthLabel.style.color = '#c084fc';
+      widthLabel.style.background = 'rgba(168, 85, 247, 0.15)';
+    }
   }
 
   presetBtns.forEach(btn => {
@@ -20,51 +103,48 @@ function updateUI(widthVal) {
   }
 }
 
-// Send message to active Gemini tab(s) to apply width in real-time
 function broadcastWidthChange(widthVal) {
   chrome.storage.local.set({ [STORAGE_KEY]: widthVal }, () => {
-    // Notify all active Gemini tabs
     chrome.tabs.query({ url: '*://gemini.google.com/*' }, (tabs) => {
       tabs.forEach(tab => {
         chrome.tabs.sendMessage(tab.id, {
           action: 'SET_CHAT_WIDTH',
           width: widthVal
-        }).catch(() => {
-          // Tab might not have script loaded or is sleeping
-        });
+        }).catch(() => {});
       });
     });
   });
 }
 
-// Handle preset buttons
 presetBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     const widthVal = btn.dataset.width;
-    updateUI(widthVal);
+    updateUI(widthVal, true);
     broadcastWidthChange(widthVal);
   });
 });
 
-// Handle slider
-slider.addEventListener('input', (e) => {
+slider?.addEventListener('input', (e) => {
   const widthVal = `${e.target.value}px`;
-  updateUI(widthVal);
+  updateUI(widthVal, true);
   broadcastWidthChange(widthVal);
 });
 
-// Load saved preference on popup open
+// Initialize on popup open
 document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.local.get([STORAGE_KEY], (res) => {
     const saved = res[STORAGE_KEY] || 'default';
-    updateUI(saved);
 
-    // Try to query active tab for latest live state
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0] && tabs[0].id && tabs[0].url && tabs[0].url.includes('gemini.google.com')) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'GET_CHAT_WIDTH' }, (response) => {
+      const activeTab = tabs[0];
+      const isGemini = activeTab && activeTab.url && activeTab.url.includes('gemini.google.com');
+
+      updateUI(saved, isGemini);
+
+      if (isGemini && activeTab.id) {
+        chrome.tabs.sendMessage(activeTab.id, { action: 'GET_CHAT_WIDTH' }, (response) => {
           if (!chrome.runtime.lastError && response && response.width) {
-            updateUI(response.width);
+            updateUI(response.width, true);
           }
         });
       }

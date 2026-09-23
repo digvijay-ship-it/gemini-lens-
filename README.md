@@ -6,6 +6,7 @@ A feature-packed, lightweight Chrome Extension designed for **Google Gemini** (`
 
 ## ✨ Features
 
+- 🌐 **Universal Element Snipping (Any Website!)**: Click "Snip Element" in the toolbar popup to hover and capture paragraphs, tables, images, or code blocks on **any website** (Wikipedia, Twitter/X, GitHub, Blogs, Docs).
 - 📸 **1-Click Full Response Screenshot**: Captures the entire long Gemini response card seamlessly using viewport scrolling, container bounds clipping, and pixel-perfect delta stitching.
 - 🎯 **Granular Element Selection (Snipping Mode)**: Hover over and capture individual paragraphs, list items (`<li>`), tables, or code snippets with glowing purple outlines.
 - 📋 **Direct-to-Clipboard & Auto-Download**: Automatically copies captured screenshots to your clipboard so you can paste (`Ctrl + V`) immediately into Discord, Slack, WhatsApp, or image editors.
@@ -32,7 +33,7 @@ A feature-packed, lightweight Chrome Extension designed for **Google Gemini** (`
 3. Enable **Developer mode** using the toggle in the top-right corner.
 4. Click **Load unpacked** in the top-left corner.
 5. Select the `gemini-screenshot-extension` folder.
-6. Open [Gemini](https://gemini.google.com/) and start enjoying full-page captures and custom chat widths!
+6. Open any website or [Gemini](https://gemini.google.com/) and start enjoying universal snips, full-page captures, and custom chat widths!
 
 ---
 
@@ -46,11 +47,12 @@ gemini-screenshot-extension/
 │   ├── icon48.png
 │   └── icon128.png
 ├── background.js       # Background service worker (GPU viewport capture)
-├── content.js          # DOM injector, scroll stitcher, element selector & width CSS
+├── content.js          # Gemini DOM injector, scroll stitcher, element selector & width CSS
+├── universal_snip.js   # Universal on-demand element snipper for any webpage
 ├── generate_icons.py   # High-resolution icon generator
 ├── manifest.json       # Chrome Manifest V3 configuration
-├── popup.html          # Toolbar popup UI (width controls & presets)
-├── popup.js            # Toolbar popup script (live tab messaging)
+├── popup.html          # Toolbar popup UI (universal tools & Gemini controls)
+├── popup.js            # Toolbar popup script (tab messaging & dynamic script injection)
 ├── .gitignore
 └── README.md
 ```

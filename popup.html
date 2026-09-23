@@ -182,6 +182,33 @@
       transform: scale(1.25);
     }
 
+    .action-btn {
+      background: linear-gradient(135deg, #22242a, #2c2f38);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: #ffffff;
+      padding: 9px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .action-btn:hover {
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      border-color: #c084fc;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4);
+    }
+
+    .action-btn:active {
+      transform: translateY(1px);
+    }
+
     .info-card {
       background: rgba(168, 85, 247, 0.06);
       border: 1px solid rgba(168, 85, 247, 0.2);
@@ -191,7 +218,7 @@
       color: #c4b5fd;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 5px;
       line-height: 1.4;
     }
 
@@ -211,12 +238,30 @@
   <div class="header">
     <div class="logo-group">
       <img src="icons/icon32.png" width="28" height="28" alt="Logo" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);">
-      <span class="logo-title">Gemini Helper</span>
+      <span class="logo-title">Gemini Lens</span>
     </div>
-    <span class="badge">v1.0</span>
+    <span class="badge">v2.0 Universal</span>
   </div>
 
+  <!-- Universal Screenshot Tools -->
   <div class="section">
+    <div class="section-title-row">
+      <span class="section-title">📸 Universal Screenshot</span>
+      <span class="current-val" style="color: #4ade80; background: rgba(74, 222, 128, 0.15);">Any Website</span>
+    </div>
+
+    <div class="presets-grid">
+      <button class="action-btn" id="btn-snip-element" title="Hover over any element on the page to snip and copy">
+        <span>🎯</span> Snip Element
+      </button>
+      <button class="action-btn" id="btn-capture-screen" title="Instant viewport screenshot to clipboard">
+        <span>📷</span> Full Viewport
+      </button>
+    </div>
+  </div>
+
+  <!-- Gemini Specific Controls -->
+  <div class="section" id="gemini-width-section">
     <div class="section-title-row">
       <span class="section-title">↔️ Chat Width</span>
       <span class="current-val" id="current-width-label">Default</span>
@@ -241,13 +286,13 @@
   </div>
 
   <div class="info-card">
-    <div>📸 <strong>Card Screenshot:</strong> Hover over any response card to capture Full or Select mode.</div>
-    <div>⚡ <strong>Smart Enter & Clean:</strong> Auto-submits on upload & clears stuck image attachments.</div>
-    <div>✨ <strong>Disclaimer Removed:</strong> Bottom AI warning is permanently hidden for clean spacing.</div>
+    <div>🌐 <strong>Any Website:</strong> Click "Snip Element" to capture tables, images, or code on any site.</div>
+    <div>✨ <strong>Gemini Lens:</strong> Hover cards for auto-stitched long response captures.</div>
+    <div>⚡ <strong>Smart Input:</strong> Auto-submits on upload and auto-clears stuck images.</div>
   </div>
 
   <div class="footer">
-    Settings auto-saved & synced with Gemini
+    Universal Clipboard Screenshots & Gemini Helper
   </div>
 
   <script src="popup.js"></script>
