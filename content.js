@@ -1074,52 +1074,8 @@
 
     function findSubmitButton() {
       return document.querySelector(
-        'button[aria-label="Send message"], button[aria-label*="Send" i], button[aria-label*="Submit" i], .send-button'
+        'button[aria-label="Send message"], button[aria-label*="Send" i], button.send-button'
       );
-    }
-
-    // Force clear any attachment remnants stuck in the input area
-    function clearStuckAttachment() {
-      const attachments = document.querySelectorAll(
-        'gem-media-attachment, .gem-attachment-container, .xap-uploader-dropzone'
-      );
-      attachments.forEach((att) => {
-        // Attempt to find and click the native cancel/delete button inside the thumbnail
-        const removeBtn = att.querySelector(
-          'button[aria-label*="Remove" i], button[aria-label*="Delete" i], button[aria-label*="Clear" i], button[aria-label*="Close" i], .close-button, .delete-button, button.remove-btn'
-        );
-        if (removeBtn) {
-          console.log('[GeminiLens] Clicking attachment remove button.');
-          removeBtn.click();
-        } else if (att.tagName.toLowerCase() === 'gem-media-attachment') {
-          console.log('[GeminiLens] Removing orphaned gem-media-attachment.');
-          att.remove();
-        }
-      });
-
-      // Clear any blob image tags inside Quill editor if lingering
-      const editor = document.querySelector('div.ql-editor[contenteditable="true"]');
-      if (editor) {
-        const blobImgs = editor.querySelectorAll('img[src^="blob:"]');
-        blobImgs.forEach((img) => img.remove());
-      }
-
-      resetStuckUploaderHeight();
-    }
-
-    function scheduleAttachmentCleanup() {
-      let checks = 0;
-      const cleanupInterval = setInterval(() => {
-        checks++;
-        // If an attachment is still lingering after submitting, clear it
-        if (hasAttachment()) {
-          clearStuckAttachment();
-        }
-        if (checks >= 8 || !hasAttachment()) {
-          clearInterval(cleanupInterval);
-          resetStuckUploaderHeight();
-        }
-      }, 250);
     }
 
     function retrySubmit() {
@@ -1136,7 +1092,6 @@
           enterQueued = false;
           clearInterval(retry);
           console.log('[GeminiLens] Submitted queued message.');
-          scheduleAttachmentCleanup();
           return;
         }
         if (attempts > 25) {
@@ -1169,7 +1124,7 @@
       }, 100);
     }
 
-    // Intercept Enter key
+    // Intercept Enter key: if user hits Enter while image is still uploading, queue it
     document.addEventListener(
       'keydown',
       function (e) {
@@ -1191,23 +1146,6 @@
             console.log('[GeminiLens] Enter queued while image is uploading.');
             pollForUploadDone();
           }
-        } else {
-          // Normal Enter send - schedule cleanup to make sure attachment doesn't get stuck
-          setTimeout(scheduleAttachmentCleanup, 200);
-        }
-      },
-      true
-    );
-
-    // Also monitor manual clicks on the Send button
-    document.addEventListener(
-      'click',
-      (e) => {
-        const sendBtn = e.target.closest(
-          'button[aria-label*="Send" i], button[aria-label*="Submit" i], .send-button'
-        );
-        if (sendBtn) {
-          setTimeout(scheduleAttachmentCleanup, 200);
         }
       },
       true
