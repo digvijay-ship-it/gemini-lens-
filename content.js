@@ -1050,53 +1050,87 @@
   // =========================================================================
   function initInputHelper() {
     let enterQueued = false;
+    let postSubmitWatchTimer = null;
+    let postSubmitEndTime = 0;
 
-    function hasAttachment() {
-      return !!(
-        document.querySelector('gem-media-attachment') ||
-        document.querySelector('.gem-attachment-container') ||
-        document.querySelector('.xap-uploader-dropzone img') ||
-        document.querySelector('img[src^="blob:"]')
+    function getInputArea() {
+      return (
+        document.querySelector('input-area-v2') ||
+        document.querySelector('[data-test-id="chat-input-container"]') ||
+        document.querySelector('.input-area-container') ||
+        document.querySelector('.bottom-container') ||
+        document.querySelector('.input-area') ||
+        document
       );
     }
 
-    function isUploading() {
-      const area = document.querySelector('.xap-uploader-dropzone');
-      if (area?.querySelector('.mdc-circular-progress--indeterminate, .mdc-circular-progress, mat-progress-spinner, mat-spinner, [role="progressbar"]')) {
-        return true;
-      }
-      const img = document.querySelector('img.gem-attachment-style-img, .xap-uploader-dropzone img');
-      if (img && (img.naturalWidth === 0 || !img.complete)) {
-        return true;
-      }
-      return false;
+    function hasAttachmentInInput() {
+      const area = getInputArea();
+      return !!(
+        area.querySelector('gem-media-attachment') ||
+        area.querySelector('.gem-attachment-container') ||
+        area.querySelector('.gem-attachment-tile') ||
+        area.querySelector('.xap-uploader-dropzone img') ||
+        area.querySelector('.ql-editor img[src^="blob:"]')
+      );
     }
 
     function findSubmitButton() {
       return document.querySelector(
-        'button[aria-label="Send message"], button[aria-label*="Send" i], button.send-button'
+        'button[aria-label="Send message"], button[aria-label*="Send message" i], button[aria-label*="Send" i], button.send-button'
       );
+    }
+
+    function isAttachmentUploading() {
+      const area = getInputArea();
+      if (!hasAttachmentInInput()) return false;
+
+      // 1. Loading state class or indeterminate spinners/progress bars
+      if (
+        area.querySelector(
+          '.gem-attachment-content.loading, .loading, .mdc-circular-progress--indeterminate, .mdc-circular-progress, mat-progress-spinner, mat-spinner, [role="progressbar"], .spinner, .uploading'
+        )
+      ) {
+        return true;
+      }
+
+      // 2. Attached image element not fully loaded
+      const img = area.querySelector('img.gem-attachment-style-img, .xap-uploader-dropzone img, gem-media-attachment img');
+      if (img && (img.naturalWidth === 0 || !img.complete)) {
+        return true;
+      }
+
+      // 3. Send button disabled while attachment is in the input box
+      const btn = findSubmitButton();
+      if (btn && (btn.disabled || btn.getAttribute('aria-disabled') === 'true')) {
+        return true;
+      }
+
+      return false;
     }
 
     function isVoiceRecording() {
-      return !!(
-        document.querySelector('mat-icon[fonticon="stop"]') ||
-        document.querySelector('[data-mat-icon-name="stop"]') ||
-        document.querySelector('button[aria-label*="recording" i]') ||
-        document.querySelector('.recording-pulse, .voice-active')
+      // Specifically target the dictate / voice recording button, NEVER the "Stop response" button
+      const dictBtn = document.querySelector(
+        'button[aria-label*="Stop dictation" i], button[aria-label*="dictat" i], button[aria-label*="listening" i], button[aria-label*="speech" i]'
       );
+      if (!dictBtn) return false;
+
+      const aria = (dictBtn.getAttribute('aria-label') || '').toLowerCase();
+      const hasStopIcon = !!dictBtn.querySelector(
+        'mat-icon[fonticon="stop"], [data-mat-icon-name="stop"], .icon-filled'
+      );
+
+      return hasStopIcon || aria.includes('stop') || aria.includes('listening');
     }
 
     function clearInputAreaStuckAttachment() {
-      // Never remove attachments while user is actively recording voice
+      // NEVER remove attachments while user is actively recording voice
       if (isVoiceRecording()) return;
 
-      const inputArea = document.querySelector(
-        'input-area-v2, [data-test-id="chat-input-container"], .input-area-container, .bottom-container'
-      ) || document.querySelector('.input-area') || document;
-
+      const inputArea = getInputArea();
       const attachments = inputArea.querySelectorAll(
-        'gem-media-attachment, .gem-attachment-container, .xap-uploader-dropzone'
+        'gem-media-attachment, .gem-attachment-container, .gem-attachment-tile'
       );
 
       if (attachments.length === 0) {
@@ -1107,53 +1141,85 @@
       console.log(`[GeminiLens] Clearing ${attachments.length} stuck attachment(s) from input area.`);
 
       attachments.forEach((att) => {
-        // 1. Try to find and click the native cancel/delete/remove button inside the thumbnail
-        const removeBtn = att.querySelector(
-          'button[aria-label*="Remove" i], button[aria-label*="Delete" i], button[aria-label*="Clear" i], button[aria-label*="Close" i], .close-button, .delete-button, button.remove-btn, [data-test-id*="remove" i], [data-test-id*="delete" i], button mat-icon[fonticon="close"], button mat-icon[fonticon="cancel"]'
-        ) || att.querySelector('button');
+        // 1. Dispatch click on the native close button inside the attachment
+        const closeBtn = att.querySelector(
+          '.gem-attachment-close-button button, button[aria-label="close attachment"], button[aria-label*="close" i], button[aria-label*="remove" i], button[aria-label*="delete" i], button[aria-label*="clear" i], .close-button, .delete-button, button mat-icon[fonticon="close"], button mat-icon[fonticon="cancel"], button'
+        );
 
-        if (removeBtn) {
-          removeBtn.click();
+        if (closeBtn) {
+          try {
+            closeBtn.click();
+          } catch (err) {}
         }
 
-        // 2. If element is still lingering after 120ms, force remove it
+        // 2. Fallback: cleanly remove the attachment DOM node after brief delay if Angular hasn't unmounted it
         setTimeout(() => {
-          if (att && att.parentNode) {
-            att.remove();
-          }
+          try {
+            if (att && att.parentNode) {
+              att.remove();
+            }
+          } catch (e) {}
           resetStuckUploaderHeight();
-        }, 120);
+        }, 80);
       });
 
-      // 3. Clear any orphaned blob images inside the Quill editor if editor text was cleared
+      // 3. Clear any orphaned blob images inside the Quill editor if editor text is empty
       const editor = inputArea.querySelector('div.ql-editor[contenteditable="true"]');
       if (editor) {
         const textContent = editor.textContent.trim();
-        if (!textContent || textContent.length === 0) {
-          const blobImgs = editor.querySelectorAll('img[src^="blob:"]');
-          blobImgs.forEach((img) => img.remove());
+        if (!textContent) {
+          editor.querySelectorAll('img[src^="blob:"]').forEach((img) => img.remove());
         }
       }
 
       resetStuckUploaderHeight();
     }
 
-    function scheduleStuckAttachmentClear() {
-      if (isVoiceRecording()) return;
+    function startPostSubmissionWatcher(durationMs = 8000) {
+      postSubmitEndTime = Math.max(postSubmitEndTime, Date.now() + durationMs);
+      if (postSubmitWatchTimer) return;
 
-      setTimeout(() => {
-        clearInputAreaStuckAttachment();
-      }, 250);
+      postSubmitWatchTimer = setInterval(() => {
+        if (Date.now() > postSubmitEndTime) {
+          clearInterval(postSubmitWatchTimer);
+          postSubmitWatchTimer = null;
+          return;
+        }
 
-      setTimeout(() => {
-        clearInputAreaStuckAttachment();
-      }, 650);
+        // Do not touch attachments while user is actively recording voice
+        if (isVoiceRecording()) return;
+
+        const inputArea = getInputArea();
+        const attachments = inputArea.querySelectorAll(
+          'gem-media-attachment, .gem-attachment-container, .gem-attachment-tile'
+        );
+
+        if (attachments.length === 0) {
+          resetStuckUploaderHeight();
+          return;
+        }
+
+        // If Gemini is generating response OR if editor text is empty, the attachment in input is stuck
+        const isGenerating = !!document.querySelector(
+          'button[aria-label*="Stop response" i], button[aria-label*="Stop generating" i]'
+        );
+        const editor = inputArea.querySelector('div.ql-editor[contenteditable="true"]');
+        const editorEmpty = !editor || !editor.textContent.trim();
+
+        if (isGenerating || editorEmpty) {
+          clearInputAreaStuckAttachment();
+        }
+      }, 150);
     }
 
-    // Expose for MutationObserver detection when query/response is added to DOM
-    window.__geminiLensScheduleStuckClear = scheduleStuckAttachmentClear;
+    // Expose for external calls and MutationObserver
+    window.__geminiLensStartPostSubmissionWatcher = startPostSubmissionWatcher;
+    window.__geminiLensScheduleStuckClear = function () {
+      startPostSubmissionWatcher(8000);
+      clearInputAreaStuckAttachment();
+    };
 
-    function retrySubmit() {
+    function triggerSubmit() {
       let attempts = 0;
       const retry = setInterval(() => {
         attempts++;
@@ -1162,20 +1228,20 @@
           return;
         }
         const btn = findSubmitButton();
-        if (btn && !btn.disabled) {
-          btn.click();
+        if (btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
           enterQueued = false;
           clearInterval(retry);
+          btn.click();
           console.log('[GeminiLens] Submitted queued message.');
-          scheduleStuckAttachmentClear();
+          startPostSubmissionWatcher(8000);
           return;
         }
-        if (attempts > 25) {
+        if (attempts > 35) {
           enterQueued = false;
           clearInterval(retry);
           console.warn('[GeminiLens] Submit button remained disabled.');
         }
-      }, 150);
+      }, 100);
     }
 
     function pollForUploadDone() {
@@ -1186,10 +1252,10 @@
           clearInterval(poll);
           return;
         }
-        if (!isUploading()) {
+        if (!isAttachmentUploading()) {
           clearInterval(poll);
-          console.log('[GeminiLens] Image upload complete — submitting.');
-          retrySubmit();
+          console.log('[GeminiLens] Attachment upload complete — submitting.');
+          triggerSubmit();
           return;
         }
         if (elapsed > 35000) {
@@ -1214,31 +1280,31 @@
           active?.closest('input-area-v2');
         if (!inInput) return;
 
-        if (hasAttachment() && isUploading()) {
+        if (hasAttachmentInInput() && isAttachmentUploading()) {
           e.preventDefault();
           e.stopPropagation();
           if (!enterQueued) {
             enterQueued = true;
-            console.log('[GeminiLens] Enter queued while image is uploading.');
+            console.log('[GeminiLens] Enter queued while attachment is uploading.');
             pollForUploadDone();
           }
         } else {
-          // Normal Enter send - schedule cleanup once query enters chat
-          scheduleStuckAttachmentClear();
+          // Normal Enter send - start post-submission watcher
+          startPostSubmissionWatcher(8000);
         }
       },
       true
     );
 
-    // Also monitor manual clicks on the Send button (strictly excluding mic / recording stop buttons)
+    // Also monitor manual clicks on the Send button (strictly excluding mic / dictate buttons)
     document.addEventListener(
       'click',
       (e) => {
         const sendBtn = e.target.closest(
           'button[aria-label="Send message"], button[aria-label*="Send message" i], .send-button'
         );
-        if (sendBtn && !sendBtn.querySelector('mat-icon[fonticon="stop"], mat-icon[fonticon="mic"]') && !isVoiceRecording()) {
-          scheduleStuckAttachmentClear();
+        if (sendBtn && !sendBtn.closest('button[aria-label*="dictat" i]') && !isVoiceRecording()) {
+          startPostSubmissionWatcher(8000);
         }
       },
       true
@@ -1262,9 +1328,7 @@
         range.collapse(false);
         sel.removeAllRanges();
         sel.addRange(range);
-      } catch (err) {
-        // fallback
-      }
+      } catch (err) {}
     }
 
     document.addEventListener(
@@ -1287,7 +1351,7 @@
 
     // Reset stuck --uploader-height gap
     function resetStuckUploaderHeight() {
-      if (hasAttachment()) return;
+      if (hasAttachmentInInput()) return;
       document.querySelectorAll('input-area-v2, .ql-editor').forEach((el) => {
         const current = el.style.getPropertyValue('--uploader-height');
         if (current && current !== '0px') {
@@ -1296,7 +1360,7 @@
       });
     }
 
-    setInterval(resetStuckUploaderHeight, 500);
+    setInterval(resetStuckUploaderHeight, 400);
   }
 
   // Detect and inject cards
@@ -1323,17 +1387,17 @@
             const tag = node.tagName.toLowerCase();
             if (tag === 'model-response') {
               injectButton(node);
-              window.__geminiLensScheduleStuckClear?.();
+              window.__geminiLensStartPostSubmissionWatcher?.(8000);
             } else if (tag === 'user-query' || node.classList?.contains('user-query-container')) {
-              window.__geminiLensScheduleStuckClear?.();
+              window.__geminiLensStartPostSubmissionWatcher?.(8000);
             } else {
               const cards = node.querySelectorAll('model-response');
               if (cards.length > 0) {
                 cards.forEach(card => injectButton(card));
-                window.__geminiLensScheduleStuckClear?.();
+                window.__geminiLensStartPostSubmissionWatcher?.(8000);
               }
               if (node.querySelector?.('user-query, .user-query-container')) {
-                window.__geminiLensScheduleStuckClear?.();
+                window.__geminiLensStartPostSubmissionWatcher?.(8000);
               }
             }
           }
