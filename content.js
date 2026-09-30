@@ -1078,6 +1078,81 @@
       );
     }
 
+    function isVoiceRecording() {
+      return !!(
+        document.querySelector('mat-icon[fonticon="stop"]') ||
+        document.querySelector('[data-mat-icon-name="stop"]') ||
+        document.querySelector('button[aria-label*="recording" i]') ||
+        document.querySelector('.recording-pulse, .voice-active')
+      );
+    }
+
+    function clearInputAreaStuckAttachment() {
+      // Never remove attachments while user is actively recording voice
+      if (isVoiceRecording()) return;
+
+      const inputArea = document.querySelector(
+        'input-area-v2, [data-test-id="chat-input-container"], .input-area-container, .bottom-container'
+      ) || document.querySelector('.input-area') || document;
+
+      const attachments = inputArea.querySelectorAll(
+        'gem-media-attachment, .gem-attachment-container, .xap-uploader-dropzone'
+      );
+
+      if (attachments.length === 0) {
+        resetStuckUploaderHeight();
+        return;
+      }
+
+      console.log(`[GeminiLens] Clearing ${attachments.length} stuck attachment(s) from input area.`);
+
+      attachments.forEach((att) => {
+        // 1. Try to find and click the native cancel/delete/remove button inside the thumbnail
+        const removeBtn = att.querySelector(
+          'button[aria-label*="Remove" i], button[aria-label*="Delete" i], button[aria-label*="Clear" i], button[aria-label*="Close" i], .close-button, .delete-button, button.remove-btn, [data-test-id*="remove" i], [data-test-id*="delete" i], button mat-icon[fonticon="close"], button mat-icon[fonticon="cancel"]'
+        ) || att.querySelector('button');
+
+        if (removeBtn) {
+          removeBtn.click();
+        }
+
+        // 2. If element is still lingering after 120ms, force remove it
+        setTimeout(() => {
+          if (att && att.parentNode) {
+            att.remove();
+          }
+          resetStuckUploaderHeight();
+        }, 120);
+      });
+
+      // 3. Clear any orphaned blob images inside the Quill editor if editor text was cleared
+      const editor = inputArea.querySelector('div.ql-editor[contenteditable="true"]');
+      if (editor) {
+        const textContent = editor.textContent.trim();
+        if (!textContent || textContent.length === 0) {
+          const blobImgs = editor.querySelectorAll('img[src^="blob:"]');
+          blobImgs.forEach((img) => img.remove());
+        }
+      }
+
+      resetStuckUploaderHeight();
+    }
+
+    function scheduleStuckAttachmentClear() {
+      if (isVoiceRecording()) return;
+
+      setTimeout(() => {
+        clearInputAreaStuckAttachment();
+      }, 250);
+
+      setTimeout(() => {
+        clearInputAreaStuckAttachment();
+      }, 650);
+    }
+
+    // Expose for MutationObserver detection when query/response is added to DOM
+    window.__geminiLensScheduleStuckClear = scheduleStuckAttachmentClear;
+
     function retrySubmit() {
       let attempts = 0;
       const retry = setInterval(() => {
@@ -1092,6 +1167,7 @@
           enterQueued = false;
           clearInterval(retry);
           console.log('[GeminiLens] Submitted queued message.');
+          scheduleStuckAttachmentClear();
           return;
         }
         if (attempts > 25) {
@@ -1146,6 +1222,23 @@
             console.log('[GeminiLens] Enter queued while image is uploading.');
             pollForUploadDone();
           }
+        } else {
+          // Normal Enter send - schedule cleanup once query enters chat
+          scheduleStuckAttachmentClear();
+        }
+      },
+      true
+    );
+
+    // Also monitor manual clicks on the Send button (strictly excluding mic / recording stop buttons)
+    document.addEventListener(
+      'click',
+      (e) => {
+        const sendBtn = e.target.closest(
+          'button[aria-label="Send message"], button[aria-label*="Send message" i], .send-button'
+        );
+        if (sendBtn && !sendBtn.querySelector('mat-icon[fonticon="stop"], mat-icon[fonticon="mic"]') && !isVoiceRecording()) {
+          scheduleStuckAttachmentClear();
         }
       },
       true
@@ -1221,17 +1314,27 @@
     const cards = document.querySelectorAll('model-response');
     cards.forEach(card => injectButton(card));
     
-    // Inject into dynamically loaded cards and hide new disclaimers
+    // Inject into dynamically loaded cards, hide new disclaimers, and clear stuck attachments on new user query / model response
     const observer = new MutationObserver((mutations) => {
       removeDisclaimers();
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            if (node.tagName.toLowerCase() === 'model-response') {
+            const tag = node.tagName.toLowerCase();
+            if (tag === 'model-response') {
               injectButton(node);
+              window.__geminiLensScheduleStuckClear?.();
+            } else if (tag === 'user-query' || node.classList?.contains('user-query-container')) {
+              window.__geminiLensScheduleStuckClear?.();
             } else {
               const cards = node.querySelectorAll('model-response');
-              cards.forEach(card => injectButton(card));
+              if (cards.length > 0) {
+                cards.forEach(card => injectButton(card));
+                window.__geminiLensScheduleStuckClear?.();
+              }
+              if (node.querySelector?.('user-query, .user-query-container')) {
+                window.__geminiLensScheduleStuckClear?.();
+              }
             }
           }
         }
